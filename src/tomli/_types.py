@@ -61,8 +61,3 @@ class Spanned(Generic[T]):
 
     def span(self) -> slice:
         return slice(self.__start, self.__end)
-
-    def offset_by(self, offset: int) -> "Spanned":
-        self.__start += offset
-        self.__end += offset
-        return self
