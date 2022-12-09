@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 import string
 from types import MappingProxyType
-from typing import IO, Any, Generator, Generic, NamedTuple, Tuple, TypeVar, Union
+from typing import IO, Any, List, NamedTuple
 
 from ._re import (
     RE_DATETIME,
@@ -17,7 +17,7 @@ from ._re import (
     match_to_localtime,
     match_to_number,
 )
-from ._types import Key, ParseFloat, Pos
+from ._types import Key, ParseFloat, Pos, Spanned
 
 ASCII_CTRL = frozenset(chr(i) for i in range(32)) | frozenset(chr(127))
 
@@ -52,64 +52,6 @@ BASIC_STR_ESCAPE_REPLACEMENTS = MappingProxyType(
 
 class TOMLDecodeError(ValueError):
     """An error raised if a document is not valid TOML."""
-
-
-T = TypeVar("T", bound=Union[dict[str, Any], Tuple[str, ...]])
-
-
-class Spanned(Generic[T]):
-    def __init__(self, inner: T, start: int = 0, end: int = 0) -> None:
-        self.__inner = inner
-        self.__start = start
-        self.__end = end
-
-    def __iter__(self) -> Generator:
-        return iter(self.__inner)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Spanned):
-            return self.__inner == other.__inner
-        else:
-            return self.__inner == other
-
-    def __getitem__(self, key: Union[str, int, slice]) -> Any:
-        if isinstance(key, (int, slice)) and isinstance(self.__inner, tuple):
-            return self.__inner[key]
-        elif isinstance(key, str) and isinstance(self.__inner, dict):
-            return self.__inner[key]
-        else:
-            raise KeyError(
-                f"Unsupported key type {type(key)} for object type {type(self.__inner)}"
-            )
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        if isinstance(self.__inner, dict):
-            self.__inner.__setitem__(key, value)
-        else:
-            raise ValueError(f"Cannot set value of {self.__inner}")
-
-    def __getattr__(self, key: str) -> Any:
-        return getattr(self.__inner, key)
-
-    def __hash__(self) -> int:
-        return hash(self.__inner)
-
-    def __str__(self) -> str:
-        return str(self.__inner)
-
-    def __repr__(self) -> str:
-        return "Spanned(%s, %d:%d)" % (repr(self.__inner), self.__start, self.__end)
-
-    def inner(self) -> T:
-        return self.__inner
-
-    def span(self) -> slice:
-        return slice(self.__start, self.__end)
-
-    def offset_by(self, offset: int) -> "Spanned":
-        self.__start += offset
-        self.__end += offset
-        return self
 
 
 def load(
@@ -215,7 +157,8 @@ class Flags:
             self.set(key, flag, recursive=False)
         self._pending_flags.clear()
 
-    def unset_all(self, key: Key) -> None:
+    def unset_all(self, spanned_key: Key) -> None:
+        key: List[str] = [k.inner() for k in spanned_key]
         cont = self._flags
         for k in key[:-1]:
             if k not in cont:
@@ -223,7 +166,10 @@ class Flags:
             cont = cont[k]["nested"]
         cont.pop(key[-1], None)
 
-    def set(self, key: Key, flag: int, *, recursive: bool) -> None:  # noqa: A003
+    def set(  # noqa: A003
+        self, spanned_key: Key, flag: int, *, recursive: bool
+    ) -> None:
+        key: List[str] = [k.inner() for k in spanned_key]
         cont = self._flags
         key_parent, key_stem = key[:-1], key[-1]
         for k in key_parent:
@@ -234,7 +180,9 @@ class Flags:
             cont[key_stem] = {"flags": set(), "recursive_flags": set(), "nested": {}}
         cont[key_stem]["recursive_flags" if recursive else "flags"].add(flag)
 
-    def is_(self, key: Key, flag: int) -> bool:
+    def is_(self, spanned_key: Key, flag: int) -> bool:
+        key: List[str] = [k.inner() for k in spanned_key]
+
         if not key:
             return False  # document root has no flags
         cont = self._flags
@@ -259,7 +207,7 @@ class NestedDict:
 
     def get_or_create_nest(
         self,
-        key: Spanned[Key],
+        key: Key,
         *,
         access_lists: bool = True,
     ) -> dict:
@@ -274,8 +222,9 @@ class NestedDict:
                 raise KeyError("There is no nest behind this key")
         return cont
 
-    def append_nest_to_list(self, key: Spanned[Key]) -> None:
+    def append_nest_to_list(self, key: Key) -> None:
         cont = self.get_or_create_nest(key[:-1])
+        print("last key", cont)
         last_key = key[-1]
         if last_key in cont:
             list_ = cont[last_key]
@@ -346,15 +295,13 @@ def skip_comments_and_array_ws(src: str, pos: Pos) -> Pos:
 def create_dict_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     pos += 1  # Skip "["
     pos = skip_chars(src, pos, TOML_WS)
-    start = pos
     pos, key = parse_key(src, pos)
-    end = pos
 
     if out.flags.is_(key, Flags.EXPLICIT_NEST) or out.flags.is_(key, Flags.FROZEN):
         raise suffixed_err(src, pos, f"Cannot declare {key} twice")
     out.flags.set(key, Flags.EXPLICIT_NEST, recursive=False)
     try:
-        out.data.get_or_create_nest(Spanned(key, start, end))
+        out.data.get_or_create_nest(key)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
 
@@ -366,9 +313,7 @@ def create_dict_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
 def create_list_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     pos += 2  # Skip "[["
     pos = skip_chars(src, pos, TOML_WS)
-    start = pos
     pos, key = parse_key(src, pos)
-    end = pos
 
     if out.flags.is_(key, Flags.FROZEN):
         raise suffixed_err(src, pos, f"Cannot mutate immutable namespace {key}")
@@ -377,9 +322,8 @@ def create_list_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     # ...but this key precisely is still prohibited from table declaration
     out.flags.set(key, Flags.EXPLICIT_NEST, recursive=False)
     try:
-        spanned_key = Spanned(key, start, end)
-        out.data.get_or_create_nest(spanned_key)
-        out.data.append_nest_to_list(spanned_key)
+        out.data.get_or_create_nest(key)
+        out.data.append_nest_to_list(key)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
 
@@ -411,14 +355,13 @@ def key_value_rule(
         )
 
     try:
-        spanned_abs_key_parent = Spanned(abs_key_parent, pos, pos + len(abs_key_parent))
-        nest = out.data.get_or_create_nest(spanned_abs_key_parent)
+        nest = out.data.get_or_create_nest(abs_key_parent)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
     if key_stem in nest:
         raise suffixed_err(src, pos, "Cannot overwrite a value")
     # Mark inline table and array namespaces recursively immutable
-    if isinstance(value, (dict, list)):
+    if isinstance(value.inner(), (dict, list)):
         out.flags.set(header + key, Flags.FROZEN, recursive=True)
     nest[key_stem] = value
     return pos
@@ -426,7 +369,7 @@ def key_value_rule(
 
 def parse_key_value_pair(
     src: str, pos: Pos, parse_float: ParseFloat
-) -> tuple[Pos, Key, Any]:
+) -> tuple[Pos, Key, Spanned[Any]]:
     pos, key = parse_key(src, pos)
     try:
         char: str | None = src[pos]
@@ -458,7 +401,7 @@ def parse_key(src: str, pos: Pos) -> tuple[Pos, Key]:
         pos = skip_chars(src, pos, TOML_WS)
 
 
-def parse_key_part(src: str, pos: Pos) -> tuple[Pos, str]:
+def parse_key_part(src: str, pos: Pos) -> tuple[Pos, Spanned[str]]:
     try:
         char: str | None = src[pos]
     except IndexError:
@@ -466,7 +409,7 @@ def parse_key_part(src: str, pos: Pos) -> tuple[Pos, str]:
     if char in BARE_KEY_CHARS:
         start_pos = pos
         pos = skip_chars(src, pos, BARE_KEY_CHARS)
-        return pos, src[start_pos:pos]
+        return pos, Spanned(src[start_pos:pos], start_pos, pos)
     if char == "'":
         return parse_literal_str(src, pos)
     if char == '"':
@@ -474,18 +417,21 @@ def parse_key_part(src: str, pos: Pos) -> tuple[Pos, str]:
     raise suffixed_err(src, pos, "Invalid initial character for a key part")
 
 
-def parse_one_line_basic_str(src: str, pos: Pos) -> tuple[Pos, str]:
+def parse_one_line_basic_str(src: str, pos: Pos) -> tuple[Pos, Spanned[str]]:
     pos += 1
     return parse_basic_str(src, pos, multiline=False)
 
 
-def parse_array(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos, list]:
+def parse_array(
+    src: str, pos: Pos, parse_float: ParseFloat
+) -> tuple[Pos, Spanned[list]]:
+    start = pos
     pos += 1
     array: list = []
 
     pos = skip_comments_and_array_ws(src, pos)
     if src.startswith("]", pos):
-        return pos + 1, array
+        return pos + 1, Spanned(array, start, pos + 1)
     while True:
         pos, val = parse_value(src, pos, parse_float)
         array.append(val)
@@ -493,34 +439,34 @@ def parse_array(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos, list]
 
         c = src[pos : pos + 1]
         if c == "]":
-            return pos + 1, array
+            return pos + 1, Spanned(array, start, pos + 1)
         if c != ",":
             raise suffixed_err(src, pos, "Unclosed array")
         pos += 1
 
         pos = skip_comments_and_array_ws(src, pos)
         if src.startswith("]", pos):
-            return pos + 1, array
+            return pos + 1, Spanned(array, pos + 1)
 
 
-def parse_inline_table(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos, dict]:
+def parse_inline_table(
+    src: str, pos: Pos, parse_float: ParseFloat
+) -> tuple[Pos, Spanned[dict]]:
+    start = pos
     pos += 1
     nested_dict = NestedDict()
     flags = Flags()
 
     pos = skip_chars(src, pos, TOML_WS)
     if src.startswith("}", pos):
-        return pos + 1, nested_dict.dict
+        return pos + 1, Spanned(nested_dict.dict, start, pos + 1)
     while True:
         pos, key, value = parse_key_value_pair(src, pos, parse_float)
         key_parent, key_stem = key[:-1], key[-1]
         if flags.is_(key, Flags.FROZEN):
             raise suffixed_err(src, pos, f"Cannot mutate immutable namespace {key}")
         try:
-            spanned_key_parent = Spanned(key_parent, pos, pos + len(key_parent))
-            nest = nested_dict.get_or_create_nest(
-                spanned_key_parent, access_lists=False
-            )
+            nest = nested_dict.get_or_create_nest(key_parent, access_lists=False)
         except KeyError:
             raise suffixed_err(src, pos, "Cannot overwrite a value") from None
         if key_stem in nest:
@@ -529,10 +475,10 @@ def parse_inline_table(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos
         pos = skip_chars(src, pos, TOML_WS)
         c = src[pos : pos + 1]
         if c == "}":
-            return pos + 1, nested_dict.dict
+            return pos + 1, Spanned(nested_dict.dict, start, pos + 1)
         if c != ",":
             raise suffixed_err(src, pos, "Unclosed inline table")
-        if isinstance(value, (dict, list)):
+        if isinstance(value.inner(), (dict, list)):
             flags.set(key, Flags.FROZEN, recursive=True)
         pos += 1
         pos = skip_chars(src, pos, TOML_WS)
@@ -540,7 +486,8 @@ def parse_inline_table(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos
 
 def parse_basic_str_escape(
     src: str, pos: Pos, *, multiline: bool = False
-) -> tuple[Pos, str]:
+) -> tuple[Pos, Spanned[str]]:
+    start = pos
     escape_id = src[pos : pos + 2]
     pos += 2
     if multiline and escape_id in {"\\ ", "\\\t", "\\\n"}:
@@ -551,27 +498,28 @@ def parse_basic_str_escape(
             try:
                 char = src[pos]
             except IndexError:
-                return pos, ""
+                return pos, Spanned("", pos, pos)
             if char != "\n":
                 raise suffixed_err(src, pos, "Unescaped '\\' in a string")
             pos += 1
         pos = skip_chars(src, pos, TOML_WS_AND_NEWLINE)
-        return pos, ""
+        return pos, Spanned("", pos, pos)
     if escape_id == "\\u":
         return parse_hex_char(src, pos, 4)
     if escape_id == "\\U":
         return parse_hex_char(src, pos, 8)
     try:
-        return pos, BASIC_STR_ESCAPE_REPLACEMENTS[escape_id]
+        return pos, Spanned(BASIC_STR_ESCAPE_REPLACEMENTS[escape_id], start, pos)
     except KeyError:
         raise suffixed_err(src, pos, "Unescaped '\\' in a string") from None
 
 
-def parse_basic_str_escape_multiline(src: str, pos: Pos) -> tuple[Pos, str]:
+def parse_basic_str_escape_multiline(src: str, pos: Pos) -> tuple[Pos, Spanned[str]]:
     return parse_basic_str_escape(src, pos, multiline=True)
 
 
-def parse_hex_char(src: str, pos: Pos, hex_len: int) -> tuple[Pos, str]:
+def parse_hex_char(src: str, pos: Pos, hex_len: int) -> tuple[Pos, Spanned[str]]:
+    start = pos
     hex_str = src[pos : pos + hex_len]
     if len(hex_str) != hex_len or not HEXDIGIT_CHARS.issuperset(hex_str):
         raise suffixed_err(src, pos, "Invalid hex value")
@@ -579,19 +527,25 @@ def parse_hex_char(src: str, pos: Pos, hex_len: int) -> tuple[Pos, str]:
     hex_int = int(hex_str, 16)
     if not is_unicode_scalar_value(hex_int):
         raise suffixed_err(src, pos, "Escaped character is not a Unicode scalar value")
-    return pos, chr(hex_int)
+    return pos, Spanned(chr(hex_int), start, pos)
 
 
-def parse_literal_str(src: str, pos: Pos) -> tuple[Pos, str]:
+def parse_literal_str(src: str, pos: Pos) -> tuple[Pos, Spanned[str]]:
+    start = pos
     pos += 1  # Skip starting apostrophe
     start_pos = pos
     pos = skip_until(
         src, pos, "'", error_on=ILLEGAL_LITERAL_STR_CHARS, error_on_eof=True
     )
-    return pos + 1, src[start_pos:pos]  # Skip ending apostrophe
+    return pos + 1, Spanned(
+        src[start_pos:pos], start, pos + 1
+    )  # Skip ending apostrophe
 
 
-def parse_multiline_str(src: str, pos: Pos, *, literal: bool) -> tuple[Pos, str]:
+def parse_multiline_str(
+    src: str, pos: Pos, *, literal: bool
+) -> tuple[Pos, Spanned[str]]:
+    start = pos
     pos += 3
     if src.startswith("\n", pos):
         pos += 1
@@ -614,15 +568,15 @@ def parse_multiline_str(src: str, pos: Pos, *, literal: bool) -> tuple[Pos, str]
     # Add at maximum two extra apostrophes/quotes if the end sequence
     # is 4 or 5 chars long instead of just 3.
     if not src.startswith(delim, pos):
-        return pos, result
+        return pos, Spanned(result.inner(), start, pos)
     pos += 1
     if not src.startswith(delim, pos):
-        return pos, result + delim
+        return pos, Spanned(result.inner() + delim, start, pos)
     pos += 1
-    return pos, result + (delim * 2)
+    return pos, Spanned(result.inner() + (delim * 2), start, pos)
 
 
-def parse_basic_str(src: str, pos: Pos, *, multiline: bool) -> tuple[Pos, str]:
+def parse_basic_str(src: str, pos: Pos, *, multiline: bool) -> tuple[Pos, Spanned[str]]:
     if multiline:
         error_on = ILLEGAL_MULTILINE_BASIC_STR_CHARS
         parse_escapes = parse_basic_str_escape_multiline
@@ -638,15 +592,19 @@ def parse_basic_str(src: str, pos: Pos, *, multiline: bool) -> tuple[Pos, str]:
             raise suffixed_err(src, pos, "Unterminated string") from None
         if char == '"':
             if not multiline:
-                return pos + 1, result + src[start_pos:pos]
+                return pos + 1, Spanned(
+                    result + src[start_pos:pos], start_pos - 1, pos + 1
+                )
             if src.startswith('"""', pos):
-                return pos + 3, result + src[start_pos:pos]
+                return pos + 3, Spanned(
+                    result + src[start_pos:pos], start_pos - 1, pos + 3
+                )
             pos += 1
             continue
         if char == "\\":
             result += src[start_pos:pos]
             pos, parsed_escape = parse_escapes(src, pos)
-            result += parsed_escape
+            result += parsed_escape.inner()
             start_pos = pos
             continue
         if char in error_on:
@@ -656,7 +614,7 @@ def parse_basic_str(src: str, pos: Pos, *, multiline: bool) -> tuple[Pos, str]:
 
 def parse_value(  # noqa: C901
     src: str, pos: Pos, parse_float: ParseFloat
-) -> tuple[Pos, Any]:
+) -> tuple[Pos, Spanned[Any]]:
     try:
         char: str | None = src[pos]
     except IndexError:
@@ -679,10 +637,10 @@ def parse_value(  # noqa: C901
     # Booleans
     if char == "t":
         if src.startswith("true", pos):
-            return pos + 4, True
+            return pos + 4, Spanned(True, pos, pos + 4)
     if char == "f":
         if src.startswith("false", pos):
-            return pos + 5, False
+            return pos + 5, Spanned(False, pos, pos + 5)
 
     # Arrays
     if char == "[":
@@ -699,25 +657,29 @@ def parse_value(  # noqa: C901
             datetime_obj = match_to_datetime(datetime_match)
         except ValueError as e:
             raise suffixed_err(src, pos, "Invalid date or datetime") from e
-        return datetime_match.end(), datetime_obj
+        return datetime_match.end(), Spanned(datetime_obj, pos, datetime_match.end())
     localtime_match = RE_LOCALTIME.match(src, pos)
     if localtime_match:
-        return localtime_match.end(), match_to_localtime(localtime_match)
+        return localtime_match.end(), Spanned(
+            match_to_localtime(localtime_match), pos, localtime_match.end()
+        )
 
     # Integers and "normal" floats.
     # The regex will greedily match any type starting with a decimal
     # char, so needs to be located after handling of dates and times.
     number_match = RE_NUMBER.match(src, pos)
     if number_match:
-        return number_match.end(), match_to_number(number_match, parse_float)
+        return number_match.end(), Spanned(
+            match_to_number(number_match, parse_float), pos, number_match.end()
+        )
 
     # Special floats
     first_three = src[pos : pos + 3]
     if first_three in {"inf", "nan"}:
-        return pos + 3, parse_float(first_three)
+        return pos + 3, Spanned(parse_float(first_three), pos, pos + 3)
     first_four = src[pos : pos + 4]
     if first_four in {"-inf", "+inf", "-nan", "+nan"}:
-        return pos + 4, parse_float(first_four)
+        return pos + 4, Spanned(parse_float(first_four), pos, pos + 4)
 
     raise suffixed_err(src, pos, "Invalid value")
 
