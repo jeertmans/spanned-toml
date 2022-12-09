@@ -224,7 +224,6 @@ class NestedDict:
 
     def append_nest_to_list(self, key: Key) -> None:
         cont = self.get_or_create_nest(key[:-1])
-        print("last key", cont)
         last_key = key[-1]
         if last_key in cont:
             list_ = cont[last_key]
@@ -563,17 +562,18 @@ def parse_multiline_str(
         pos = end_pos + 3
     else:
         delim = '"'
-        pos, result = parse_basic_str(src, pos, multiline=True)
+        pos, spanned_result = parse_basic_str(src, pos, multiline=True)
+        result = result.inner()
 
     # Add at maximum two extra apostrophes/quotes if the end sequence
     # is 4 or 5 chars long instead of just 3.
     if not src.startswith(delim, pos):
-        return pos, Spanned(result.inner(), start, pos)
+        return pos, Spanned(result, start, pos)
     pos += 1
     if not src.startswith(delim, pos):
-        return pos, Spanned(result.inner() + delim, start, pos)
+        return pos, Spanned(result + delim, start, pos)
     pos += 1
-    return pos, Spanned(result.inner() + (delim * 2), start, pos)
+    return pos, Spanned(result + (delim * 2), start, pos)
 
 
 def parse_basic_str(src: str, pos: Pos, *, multiline: bool) -> tuple[Pos, Spanned[str]]:
