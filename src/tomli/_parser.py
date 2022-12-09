@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 import string
 from types import MappingProxyType
-from typing import IO, Any, NamedTuple
+from typing import IO, Any, Generator, Generic, NamedTuple, Tuple, TypeVar, Union
 
 from ._re import (
     RE_DATETIME,
@@ -54,7 +54,67 @@ class TOMLDecodeError(ValueError):
     """An error raised if a document is not valid TOML."""
 
 
-def load(__fp: IO[bytes], *, parse_float: ParseFloat = float) -> dict[str, Any]:
+T = TypeVar("T", bound=Union[dict[str, Any], Tuple[str, ...]])
+
+
+class Spanned(Generic[T]):
+    def __init__(self, inner: T, start: int = 0, end: int = 0) -> None:
+        self.__inner = inner
+        self.__start = start
+        self.__end = end
+
+    def __iter__(self) -> Generator:
+        return iter(self.__inner)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Spanned):
+            return self.__inner == other.__inner
+        else:
+            return self.__inner == other
+
+    def __getitem__(self, key: Union[str, int, slice]) -> Any:
+        if isinstance(key, (int, slice)) and isinstance(self.__inner, tuple):
+            return self.__inner[key]
+        elif isinstance(key, str) and isinstance(self.__inner, dict):
+            return self.__inner[key]
+        else:
+            raise KeyError(
+                f"Unsupported key type {type(key)} for object type {type(self.__inner)}"
+            )
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if isinstance(self.__inner, dict):
+            self.__inner.__setitem__(key, value)
+        else:
+            raise ValueError(f"Cannot set value of {self.__inner}")
+
+    def __getattr__(self, key: str) -> Any:
+        return getattr(self.__inner, key)
+
+    def __hash__(self) -> int:
+        return hash(self.__inner)
+
+    def __str__(self) -> str:
+        return str(self.__inner)
+
+    def __repr__(self) -> str:
+        return "Spanned(%s, %d:%d)" % (repr(self.__inner), self.__start, self.__end)
+
+    def inner(self) -> T:
+        return self.__inner
+
+    def span(self) -> slice:
+        return slice(self.__start, self.__end)
+
+    def offset_by(self, offset: int) -> "Spanned":
+        self.__start += offset
+        self.__end += offset
+        return self
+
+
+def load(
+    __fp: IO[bytes], *, parse_float: ParseFloat = float
+) -> Spanned[dict[str, Any]]:
     """Parse TOML from a binary file object."""
     b = __fp.read()
     try:
@@ -66,7 +126,9 @@ def load(__fp: IO[bytes], *, parse_float: ParseFloat = float) -> dict[str, Any]:
     return loads(s, parse_float=parse_float)
 
 
-def loads(__s: str, *, parse_float: ParseFloat = float) -> dict[str, Any]:  # noqa: C901
+def loads(  # noqa: C901
+    __s: str, *, parse_float: ParseFloat = float
+) -> Spanned[dict[str, Any]]:
     """Parse TOML from a string."""
 
     # The spec allows converting "\r\n" to "\n", even in string
@@ -129,7 +191,7 @@ def loads(__s: str, *, parse_float: ParseFloat = float) -> dict[str, Any]:  # no
             )
         pos += 1
 
-    return out.data.dict
+    return Spanned(out.data.dict, 0, len(src))
 
 
 class Flags:
@@ -197,7 +259,7 @@ class NestedDict:
 
     def get_or_create_nest(
         self,
-        key: Key,
+        key: Spanned[Key],
         *,
         access_lists: bool = True,
     ) -> dict:
@@ -212,7 +274,7 @@ class NestedDict:
                 raise KeyError("There is no nest behind this key")
         return cont
 
-    def append_nest_to_list(self, key: Key) -> None:
+    def append_nest_to_list(self, key: Spanned[Key]) -> None:
         cont = self.get_or_create_nest(key[:-1])
         last_key = key[-1]
         if last_key in cont:
@@ -284,13 +346,15 @@ def skip_comments_and_array_ws(src: str, pos: Pos) -> Pos:
 def create_dict_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     pos += 1  # Skip "["
     pos = skip_chars(src, pos, TOML_WS)
+    start = pos
     pos, key = parse_key(src, pos)
+    end = pos
 
     if out.flags.is_(key, Flags.EXPLICIT_NEST) or out.flags.is_(key, Flags.FROZEN):
         raise suffixed_err(src, pos, f"Cannot declare {key} twice")
     out.flags.set(key, Flags.EXPLICIT_NEST, recursive=False)
     try:
-        out.data.get_or_create_nest(key)
+        out.data.get_or_create_nest(Spanned(key, start, end))
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
 
@@ -302,7 +366,9 @@ def create_dict_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
 def create_list_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     pos += 2  # Skip "[["
     pos = skip_chars(src, pos, TOML_WS)
+    start = pos
     pos, key = parse_key(src, pos)
+    end = pos
 
     if out.flags.is_(key, Flags.FROZEN):
         raise suffixed_err(src, pos, f"Cannot mutate immutable namespace {key}")
@@ -311,7 +377,9 @@ def create_list_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     # ...but this key precisely is still prohibited from table declaration
     out.flags.set(key, Flags.EXPLICIT_NEST, recursive=False)
     try:
-        out.data.append_nest_to_list(key)
+        spanned_key = Spanned(key, start, end)
+        out.data.get_or_create_nest(spanned_key)
+        out.data.append_nest_to_list(spanned_key)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
 
@@ -324,6 +392,7 @@ def key_value_rule(
     src: str, pos: Pos, out: Output, header: Key, parse_float: ParseFloat
 ) -> Pos:
     pos, key, value = parse_key_value_pair(src, pos, parse_float)
+    print("POS", pos, key, value)
     key_parent, key_stem = key[:-1], key[-1]
     abs_key_parent = header + key_parent
 
@@ -342,7 +411,8 @@ def key_value_rule(
         )
 
     try:
-        nest = out.data.get_or_create_nest(abs_key_parent)
+        spanned_abs_key_parent = Spanned(abs_key_parent, pos, pos + len(abs_key_parent))
+        nest = out.data.get_or_create_nest(spanned_abs_key_parent)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
     if key_stem in nest:
@@ -447,7 +517,10 @@ def parse_inline_table(src: str, pos: Pos, parse_float: ParseFloat) -> tuple[Pos
         if flags.is_(key, Flags.FROZEN):
             raise suffixed_err(src, pos, f"Cannot mutate immutable namespace {key}")
         try:
-            nest = nested_dict.get_or_create_nest(key_parent, access_lists=False)
+            spanned_key_parent = Spanned(key_parent, pos, pos + len(key_parent))
+            nest = nested_dict.get_or_create_nest(
+                spanned_key_parent, access_lists=False
+            )
         except KeyError:
             raise suffixed_err(src, pos, "Cannot overwrite a value") from None
         if key_stem in nest:
