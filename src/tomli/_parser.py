@@ -182,7 +182,6 @@ class Flags:
 
     def is_(self, spanned_key: Key, flag: int) -> bool:
         key: List[str] = [k.inner() for k in spanned_key]
-
         if not key:
             return False  # document root has no flags
         cont = self._flags
@@ -321,7 +320,6 @@ def create_list_rule(src: str, pos: Pos, out: Output) -> tuple[Pos, Key]:
     # ...but this key precisely is still prohibited from table declaration
     out.flags.set(key, Flags.EXPLICIT_NEST, recursive=False)
     try:
-        out.data.get_or_create_nest(key)
         out.data.append_nest_to_list(key)
     except KeyError:
         raise suffixed_err(src, pos, "Cannot overwrite a value") from None
@@ -335,7 +333,6 @@ def key_value_rule(
     src: str, pos: Pos, out: Output, header: Key, parse_float: ParseFloat
 ) -> Pos:
     pos, key, value = parse_key_value_pair(src, pos, parse_float)
-    print("POS", pos, key, value)
     key_parent, key_stem = key[:-1], key[-1]
     abs_key_parent = header + key_parent
 
@@ -445,7 +442,7 @@ def parse_array(
 
         pos = skip_comments_and_array_ws(src, pos)
         if src.startswith("]", pos):
-            return pos + 1, Spanned(array, pos + 1)
+            return pos + 1, Spanned(array, start, pos + 1)
 
 
 def parse_inline_table(
@@ -563,7 +560,7 @@ def parse_multiline_str(
     else:
         delim = '"'
         pos, spanned_result = parse_basic_str(src, pos, multiline=True)
-        result = result.inner()
+        result = spanned_result.inner()
 
     # Add at maximum two extra apostrophes/quotes if the end sequence
     # is 4 or 5 chars long instead of just 3.
