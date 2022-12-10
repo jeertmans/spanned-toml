@@ -31,7 +31,7 @@ Spanned-Toml is a Python library for parsing [TOML](https://toml.io), with the
 addition of span information for every object (both keys and values).
 It is fully compatible with [TOML v1.0.0](https://toml.io/en/v1.0.0).
 
-spanned-Toml provides the same features and API as Tomli. The only difference
+Spanned-Toml provides the same features and API as Tomli. The only difference
 is that it returns a `Spanned[dict]`, instead of `dict`.
 
 If you whish to get the same output as with Tomli, you can always call `unspan()`
@@ -43,12 +43,24 @@ on a `Spanned` object.
 pip install spanned-toml
 ```
 
+## Why choosing Spanned-Toml over others?<a name="why-choosing-spanned_toml-over-others"></a>
+
+Spanned-Toml was mainly built for another project I am working on.
+
+You should use this package whenever you care about where specific parts in a
+TOML config file are coming from. This might be useful, e.g., if you want to
+have a validation layer, on top of the default TOML, and that you want to exactly
+pinpoint where an error originated.
+
+Otherwise, if you juste care about parsing TOML file or speed, then directly use
+Tomli (or other faster alternatives).
+
 ## Usage<a name="usage"></a>
 
 ### Parse a TOML string<a name="parse-a-toml-string"></a>
 
 ```python
-import spanned-toml as tomli
+import spanned_toml as toml
 
 toml_str = """
 [[players]]
@@ -60,19 +72,23 @@ name = "Numminen"
 number = 27
 """
 
-toml_dict = tomli.loads(toml_str).unspan()
+toml_dict = toml.loads(toml_str).unspan()
 assert toml_dict == {
     "players": [{"name": "Lehtinen", "number": 26}, {"name": "Numminen", "number": 27}]
 }
+
+player_span = toml_dict["players"][0]["name"].span()
+
+assert toml_str[player_span] == "Lehtinen"
 ```
 
 ### Parse a TOML file<a name="parse-a-toml-file"></a>
 
 ```python
-import spanned-toml as tomli
+import spanned_toml as toml
 
 with open("path_to_file/conf.toml", "rb") as f:
-    toml_dict = tomli.load(f)
+    toml_dict = toml.load(f)
 ```
 
 The file must be opened in binary mode (with the `"rb"` flag).
@@ -82,10 +98,10 @@ both of which are required to correctly parse TOML.
 ### Handle invalid TOML<a name="handle-invalid-toml"></a>
 
 ```python
-import spanned-toml as tomli
+import spanned_toml as toml
 
 try:
-    toml_dict = tomli.loads("]] this is invalid TOML [[")
+    toml_dict = toml.loads("]] this is invalid TOML [[")
 except tomli.TOMLDecodeError:
     print("Yep, definitely not valid.")
 ```
@@ -97,9 +113,9 @@ They should not be assumed to stay constant across Tomli versions.
 
 ```python
 from decimal import Decimal
-import spanned-toml as tomli
+import spanned-toml as toml
 
-toml_dict = tomli.loads("precision-matters = 0.982492", parse_float=Decimal).unspan()
+toml_dict = toml.loads("precision-matters = 0.982492", parse_float=Decimal).unspan()
 assert isinstance(toml_dict["precision-matters"], Decimal)
 assert toml_dict["precision-matters"] == Decimal("0.982492")
 ```
