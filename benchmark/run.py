@@ -10,7 +10,7 @@ import rtoml
 import toml
 import tomlkit
 
-import tomli
+import spanned_toml as tomli
 
 
 def benchmark(

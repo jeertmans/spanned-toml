@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# SPDX-FileCopyrightText: 2021 Taneli Hukkinen
+# SPDX-FileCopyrightText: 2022 Jérome Eertmans, Taneli Hukkinen
 # Licensed to PSF under a Contributor Agreement.
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def loads(  # noqa: C901
             )
         pos += 1
 
-    return Spanned(out.data.dict, 0, len(src))
+    return out.data.dict.with_span(0, len(src))
 
 
 class Flags:
@@ -202,22 +202,22 @@ class Flags:
 class NestedDict:
     def __init__(self) -> None:
         # The parsed content of the TOML document
-        self.dict: dict[str, Any] = {}
+        self.dict: Spanned[dict[str, Any]] = Spanned({})
 
     def get_or_create_nest(
         self,
         key: Key,
         *,
         access_lists: bool = True,
-    ) -> dict:
+    ) -> Spanned[dict]:
         cont: Any = self.dict
         for k in key:
             if k not in cont:
-                cont[k] = {}
+                cont[k] = Spanned({})  # Nested dicts do not have span, so 0:0 is used
             cont = cont[k]
-            if access_lists and isinstance(cont, list):
+            if access_lists and isinstance(cont.inner(), list):
                 cont = cont[-1]
-            if not isinstance(cont, dict):
+            if not isinstance(cont.inner(), dict):
                 raise KeyError("There is no nest behind this key")
         return cont
 
@@ -225,12 +225,12 @@ class NestedDict:
         cont = self.get_or_create_nest(key[:-1])
         last_key = key[-1]
         if last_key in cont:
-            list_ = cont[last_key]
+            list_ = cont[last_key].inner()
             if not isinstance(list_, list):
                 raise KeyError("An object other than list found behind this key")
-            list_.append({})
+            list_.append(Spanned({}))
         else:
-            cont[last_key] = [{}]
+            cont[last_key] = Spanned([Spanned({})])
 
 
 class Output(NamedTuple):
@@ -353,7 +353,7 @@ def key_value_rule(
     try:
         nest = out.data.get_or_create_nest(abs_key_parent)
     except KeyError:
-        raise suffixed_err(src, pos, "Cannot overwrite a value") from None
+        raise suffixed_err(src, pos, "Cannot overwrite a value") #from None
     if key_stem in nest:
         raise suffixed_err(src, pos, "Cannot overwrite a value")
     # Mark inline table and array namespaces recursively immutable

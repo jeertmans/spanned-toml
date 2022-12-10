@@ -5,9 +5,11 @@ with atheris.instrument_imports():
     import sys
     import warnings
 
+    import spanned_toml as tomli
     import tomli_w
 
-    import tomli
+    tomli.sp_loads = tomli.loads
+    tomli.loads = lambda *args, **kw: tomli.sp_loads(*args, **kw).unspan()
 
 # Disable any caching used so that the same lines of code run
 # on a given input consistently.

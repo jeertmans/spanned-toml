@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# SPDX-FileCopyrightText: 2021 Taneli Hukkinen
+# SPDX-FileCopyrightText: 2022 Jérome Eertmans, Taneli Hukkinen
 # Licensed to PSF under a Contributor Agreement.
 
 """Utilities for tests that are in the "burntsushi" format."""
