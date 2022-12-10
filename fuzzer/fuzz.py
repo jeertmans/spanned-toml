@@ -5,8 +5,9 @@ with atheris.instrument_imports():
     import sys
     import warnings
 
-    import spanned_toml as tomli
     import tomli_w
+
+    import spanned_toml as tomli
 
 # Disable any caching used so that the same lines of code run
 # on a given input consistently.

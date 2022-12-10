@@ -353,7 +353,7 @@ def key_value_rule(
     try:
         nest = out.data.get_or_create_nest(abs_key_parent)
     except KeyError:
-        raise suffixed_err(src, pos, "Cannot overwrite a value") #from None
+        raise suffixed_err(src, pos, "Cannot overwrite a value") from None
     if key_stem in nest:
         raise suffixed_err(src, pos, "Cannot overwrite a value")
     # Mark inline table and array namespaces recursively immutable

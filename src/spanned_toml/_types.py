@@ -13,11 +13,12 @@ T = TypeVar("T")
 
 
 class Spanned(Generic[T]):  # pragma: no cover
-    """
-    Generic container of any object, with span information.
+    """Generic container of any object, with span information.
 
-    Nested objects must also have a span (which can optionally be empty).
+    Nested objects must also have a span (which can optionally be
+    empty).
     """
+
     def __init__(self, inner: T, start: int = 0, end: int = 0) -> None:
         assert not isinstance(inner, Spanned), "Directly nesting spans is not allowed."
         self.__inner = inner
@@ -36,11 +37,11 @@ class Spanned(Generic[T]):  # pragma: no cover
         else:
             return self.__inner == other
 
-    def __getitem__(self, key: Union["Spanned[str]", int, slice]) -> "Spanned[Any]":
+    def __getitem__(self, key: Union["Spanned[str]", int]) -> "Spanned[Any]":
         if isinstance(self.__inner, dict):
-            return self.__inner[key]  # type: Spanned[Any]
+            return self.__inner[key]
         elif isinstance(self.__inner, list):
-            return self.__inner[key]  # type: Spanned[Any]
+            return self.__inner[key]
         else:
             raise KeyError(
                 f"Unsupported key type {type(key)} for object type {type(self.__inner)}"
@@ -65,29 +66,22 @@ class Spanned(Generic[T]):  # pragma: no cover
         return "Spanned(%s, %d:%d)" % (repr(self.__inner), self.__start, self.__end)
 
     def inner(self) -> T:
-        """
-        Return the inner object, i.e., the object without its span information.
-        """
+        """Return the inner object, i.e., the object without its span
+        information."""
         return self.__inner
 
     def span(self) -> slice:
-        """
-        Return the span of the current object as a slice.
-        """
+        """Return the span of the current object as a slice."""
         return slice(self.__start, self.__end)
 
     def with_span(self, start: int, end: int) -> "Spanned[T]":
-        """
-        Update the span of the current object.
-        """
+        """Update the span of the current object."""
         self.__start = start
         self.__end = end
         return self
 
     def unspan(self) -> Any:
-        """
-        Recursively unspan a spanned object.
-        """
+        """Recursively unspan a spanned object."""
         if isinstance(self.__inner, dict):
             return {key.unspan(): value.unspan() for key, value in self.__inner.items()}
         elif isinstance(self.__inner, list):

@@ -7,4 +7,4 @@ Since this module is basically an extended fork of Tomli, we recommend to read t
 ## 2.0.1
 
 - Added
-    - First working version of `spanned-toml`, with the exact same features as `tomli==2.0.1` [#1](https://github.com/jeertmans/spanned-toml/pull/1)
+  - First working version of `spanned-toml`, with the exact same features as `tomli==2.0.1` [#1](https://github.com/jeertmans/spanned-toml/pull/1)
