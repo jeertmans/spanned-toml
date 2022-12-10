@@ -40,7 +40,7 @@ on a `Spanned` object.
 ## Installation<a name="installation"></a>
 
 ```bash
-pip install tomli
+pip install spanned-toml
 ```
 
 ## Usage<a name="usage"></a>
@@ -48,7 +48,7 @@ pip install tomli
 ### Parse a TOML string<a name="parse-a-toml-string"></a>
 
 ```python
-import tomli
+import spanned-toml as tomli
 
 toml_str = """
 [[players]]
@@ -69,7 +69,7 @@ assert toml_dict == {
 ### Parse a TOML file<a name="parse-a-toml-file"></a>
 
 ```python
-import tomli
+import spanned-toml as tomli
 
 with open("path_to_file/conf.toml", "rb") as f:
     toml_dict = tomli.load(f)
@@ -82,7 +82,7 @@ both of which are required to correctly parse TOML.
 ### Handle invalid TOML<a name="handle-invalid-toml"></a>
 
 ```python
-import tomli
+import spanned-toml as tomli
 
 try:
     toml_dict = tomli.loads("]] this is invalid TOML [[")
@@ -97,7 +97,7 @@ They should not be assumed to stay constant across Tomli versions.
 
 ```python
 from decimal import Decimal
-import tomli
+import spanned-toml as tomli
 
 toml_dict = tomli.loads("precision-matters = 0.982492", parse_float=Decimal).unspan()
 assert isinstance(toml_dict["precision-matters"], Decimal)
