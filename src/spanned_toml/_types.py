@@ -19,6 +19,7 @@ class Spanned(Generic[T]):
     Nested objects must also have a span (which can optionally be empty).
     """
     def __init__(self, inner: T, start: int = 0, end: int = 0) -> None:
+        assert not isinstance(inner, Spanned), "Directly nesting spans is not allowed."
         self.__inner = inner
         self.__start = start
         self.__end = end

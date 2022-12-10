@@ -21,7 +21,7 @@ class TestMiscellaneous(unittest.TestCase):
             file_path.write_text(content)
 
             with open(file_path, "rb") as bin_f:
-                actual = tomllib.load(bin_f)
+                actual = tomllib.load(bin_f).unspan()
         self.assertEqual(actual, expected)
 
     def test_incorrect_load(self):
@@ -44,7 +44,7 @@ class TestMiscellaneous(unittest.TestCase):
               notnum2=-nan
               notnum3=+nan
               """
-        obj = tomllib.loads(doc, parse_float=D)
+        obj = tomllib.loads(doc, parse_float=D).unspan()
         expected = {
             "val": D("0.1"),
             "biggest1": D("inf"),
@@ -67,7 +67,7 @@ class TestMiscellaneous(unittest.TestCase):
               [bliibaa.diibaa]
               offsettime=[1979-05-27T00:32:00.999999-07:00]
               """
-        obj = tomllib.loads(doc)
+        obj = tomllib.loads(doc).unspan()
         obj_copy = copy.deepcopy(obj)
         self.assertEqual(obj_copy, obj)
         expected_obj = {
