@@ -92,7 +92,5 @@ class Spanned(Generic[T]):
             return {key.unspan(): value.unspan() for key, value in self.__inner.items()}
         elif isinstance(self.__inner, list):
             return [v.unspan() for v in self.__inner]
-        elif isinstance(self.__inner, Spanned):
-            return self.__inner.unspan()
         else:
             return self.__inner

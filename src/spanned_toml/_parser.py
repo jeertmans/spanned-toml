@@ -455,7 +455,7 @@ def parse_inline_table(
 
     pos = skip_chars(src, pos, TOML_WS)
     if src.startswith("}", pos):
-        return pos + 1, Spanned(nested_dict.dict, start, pos + 1)
+        return pos + 1, nested_dict.dict.with_span(start, pos + 1)
     while True:
         pos, key, value = parse_key_value_pair(src, pos, parse_float)
         key_parent, key_stem = key[:-1], key[-1]
@@ -471,7 +471,7 @@ def parse_inline_table(
         pos = skip_chars(src, pos, TOML_WS)
         c = src[pos : pos + 1]
         if c == "}":
-            return pos + 1, Spanned(nested_dict.dict, start, pos + 1)
+            return pos + 1, nested_dict.dict.with_span(start, pos + 1)
         if c != ",":
             raise suffixed_err(src, pos, "Unclosed inline table")
         if isinstance(value.inner(), (dict, list)):
