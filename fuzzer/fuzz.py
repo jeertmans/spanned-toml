@@ -8,9 +8,6 @@ with atheris.instrument_imports():
     import spanned_toml as tomli
     import tomli_w
 
-    tomli.sp_loads = tomli.loads
-    tomli.loads = lambda *args, **kw: tomli.sp_loads(*args, **kw).unspan()
-
 # Disable any caching used so that the same lines of code run
 # on a given input consistently.
 tomli._re.cached_tz = tomli._re.cached_tz.__wrapped__
@@ -40,7 +37,7 @@ def test_one_input(input_bytes: bytes) -> None:
         print_err(data)
         raise
 
-    roundtripped_obj = tomli.loads(recovered_data)
+    roundtripped_obj = tomli.loads(recovered_data).unspan()
     normalize_toml_obj(roundtripped_obj)
     normalize_toml_obj(toml_obj)
     if roundtripped_obj != toml_obj:
