@@ -12,7 +12,7 @@ Pos = int
 T = TypeVar("T")
 
 
-class Spanned(Generic[T]):
+class Spanned(Generic[T]):  # pragma: no cover
     """
     Generic container of any object, with span information.
 
@@ -38,9 +38,9 @@ class Spanned(Generic[T]):
 
     def __getitem__(self, key: Union["Spanned[str]", int, slice]) -> "Spanned[Any]":
         if isinstance(self.__inner, dict):
-            return self.__inner[key]
+            return self.__inner[key]  # type: Spanned[Any]
         elif isinstance(self.__inner, list):
-            return self.__inner[key]
+            return self.__inner[key]  # type: Spanned[Any]
         else:
             raise KeyError(
                 f"Unsupported key type {type(key)} for object type {type(self.__inner)}"
