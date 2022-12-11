@@ -6,23 +6,39 @@
 
 > A lil' TOML parser, but with span
 
-This project is an extension of @hukkin's Tomli libray, but with span.
+This project is an extension of
+[@hukkin's Tomli](https://github.com/hukkin/tomli) libray, but with span.
 
 A span is simply a Python `slice` that helps to retrieve where a given object
 was parsed from.
+
+## Motivation<a name="motivation"></a>
+
+TOML has become a popular format for configuration files, and many tools now
+rely on parsing such files. However, most parsers error on invalid TOML syntax,
+not configuration specific errors. E.g., what happens with the following file?
+
+```toml
+age = -45  # age should be a positive integer
+```
+
+First, you parse the TOML file, which is valid, then you invalidate the `age`
+value because it is negative. But how to pinpoint the location of where `age`
+was defined to the user?
+
+There is where Spanned-Toml comes into play. For every key / value, you can
+obtain the span information about where it was define. The span is simple a
+Python `slice`, that can be used to index the original TOML string.
 
 **Table of Contents**  *generated with [mdformat-toc](https://github.com/hukkin/mdformat-toc)*
 
 <!-- mdformat-toc start --slug=github --maxlevel=6 --minlevel=2 -->
 
+- [Motivation](#motivation)
 - [Intro](#intro)
 - [Installation](#installation)
 - [Why choosing Spanned-Toml over others?](#why-choosing-spanned-toml-over-others)
 - [Usage](#usage)
-  - [Parse a TOML string](#parse-a-toml-string)
-  - [Parse a TOML file](#parse-a-toml-file)
-  - [Handle invalid TOML](#handle-invalid-toml)
-  - [Construct `decimal.Decimal`s from TOML floats](#construct-decimaldecimals-from-toml-floats)
 
 <!-- mdformat-toc end -->
 
@@ -58,11 +74,29 @@ Tomli (or other faster alternatives).
 
 ## Usage<a name="usage"></a>
 
-### Parse a TOML string<a name="parse-a-toml-string"></a>
+Toml-Spanned has the **exact** same interface as Tomli. Therefore, I recommend
+you checking [Tomli's usage](https://github.com/hukkin/tomli#usage).
+
+The only addition is that, instead of returining an object `T`, it returns
+`Spanned[T]`, and nested objects are also `Spanned`, i.e., array and dictionnary
+values are also spanned.
+
+From `Spanned[T]`, you can always obtain the inner value `T` with `.inner()`:
 
 ```python
 import spanned_toml as toml
 
+toml_dict = toml.loads("age = 10")
+
+assert toml_dict["age"].inner() == 10
+```
+
+> NOTE: for convenience, `Spanned[T]` inherits most attributes from `T`.
+
+If you have nested `Spanned` objects, then you can call `.unspan()` to remove
+all span information, and obtain the same object as if you used Tomli.
+
+```python
 toml_str = """
 [[players]]
 name = "Lehtinen"
@@ -77,52 +111,16 @@ toml_dict = toml.loads(toml_str).unspan()
 assert toml_dict == {
     "players": [{"name": "Lehtinen", "number": 26}, {"name": "Numminen", "number": 27}]
 }
+```
 
+Last, but not least, you can retrieve the exact part of the string that was used
+to parse a given key or value.
+
+```
 player_span = toml_dict["players"][0]["name"].span()
 
-assert toml_str[player_span] == "Lehtinen"
+assert toml_str[player_span] == '"Lehtinen"'  # Quotes are included in span
 ```
 
-### Parse a TOML file<a name="parse-a-toml-file"></a>
-
-```python
-import spanned_toml as toml
-
-with open("path_to_file/conf.toml", "rb") as f:
-    toml_dict = toml.load(f)
-```
-
-The file must be opened in binary mode (with the `"rb"` flag).
-Binary mode will enforce decoding the file as UTF-8 with universal newlines disabled,
-both of which are required to correctly parse TOML.
-
-### Handle invalid TOML<a name="handle-invalid-toml"></a>
-
-```python
-import spanned_toml as toml
-
-try:
-    toml_dict = toml.loads("]] this is invalid TOML [[")
-except tomli.TOMLDecodeError:
-    print("Yep, definitely not valid.")
-```
-
-Note that error messages are considered informational only.
-They should not be assumed to stay constant across Tomli versions.
-
-### Construct `decimal.Decimal`s from TOML floats<a name="construct-decimaldecimals-from-toml-floats"></a>
-
-```python
-from decimal import Decimal
-import spanned-toml as toml
-
-toml_dict = toml.loads("precision-matters = 0.982492", parse_float=Decimal).unspan()
-assert isinstance(toml_dict["precision-matters"], Decimal)
-assert toml_dict["precision-matters"] == Decimal("0.982492")
-```
-
-Note that `decimal.Decimal` can be replaced with another callable that converts a TOML float from string to a Python type.
-The `decimal.Decimal` is, however, a practical choice for use cases where float inaccuracies can not be tolerated.
-
-Illegal types are `dict` and `list`, and their subtypes.
-A `ValueError` will be raised if `parse_float` produces illegal types.
+> NOTE: arrays of tables have an empty span, since then can be defined in
+> multiple parts of a given file.
