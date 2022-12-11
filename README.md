@@ -37,8 +37,8 @@ Python `slice`, that can be used to index the original TOML string.
 - [Motivation](#motivation)
 - [Intro](#intro)
 - [Installation](#installation)
-- [Why choosing Spanned-Toml over others?](#why-choosing-spanned-toml-over-others)
 - [Usage](#usage)
+- [Why choosing Spanned-Toml over others?](#why-choosing-spanned-toml-over-others)
 - [Versions](#versions)
 
 <!-- mdformat-toc end -->
@@ -53,7 +53,7 @@ goal is to provide span information with minimal overhead over Tomli.
 As such, Spanned-Toml provides the same features and API as Tomli, with the only
 difference is that it returns a `Spanned[dict]`, instead of `dict`.
 
-If you whish to get the same output as with Tomli, you can always call `unspan()`
+If you whish to get the same output as with Tomli, you can always call `.unspan()`
 on a `Spanned` object.
 
 ## Installation<a name="installation"></a>
@@ -61,18 +61,6 @@ on a `Spanned` object.
 ```bash
 pip install spanned-toml
 ```
-
-## Why choosing Spanned-Toml over others?<a name="why-choosing-spanned-toml-over-others"></a>
-
-Spanned-Toml was mainly built for another project I am working on.
-
-You should use this package whenever you care about where specific parts in a
-TOML config file are coming from. This might be useful, e.g., if you want to
-have a validation layer, on top of the default TOML, and that you want to exactly
-pinpoint where an error originated.
-
-Otherwise, if you juste care about parsing TOML file or speed, then directly use
-Tomli (or other faster alternatives).
 
 ## Usage<a name="usage"></a>
 
@@ -126,6 +114,18 @@ assert toml_str[player_span] == '"Lehtinen"'  # Quotes are included in span
 
 > NOTE: arrays of tables have an empty span, since then can be defined in
 > multiple parts of a given file.
+
+## Why choosing Spanned-Toml over others?<a name="why-choosing-spanned-toml-over-others"></a>
+
+Spanned-Toml was mainly built for another project I am working on.
+
+You should use this package whenever you care about where specific parts in a
+TOML config file are coming from. This might be useful, e.g., if you want to
+have a validation layer, on top of the default TOML, and that you want to exactly
+pinpoint where an error originated.
+
+Otherwise, if you juste care about parsing TOML file or speed, then directly use
+Tomli (or other faster alternatives).
 
 ## Versions<a name="versions"></a>
 
