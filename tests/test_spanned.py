@@ -2,10 +2,6 @@
 # SPDX-FileCopyrightText: 2022 Jérome Eertmans, Taneli Hukkinen
 # Licensed to PSF under a Contributor Agreement.
 
-import copy
-import datetime
-from pathlib import Path
-import tempfile
 import unittest
 
 from . import tomllib
