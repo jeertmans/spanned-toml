@@ -67,7 +67,7 @@ pip install spanned-toml
 Toml-Spanned has the **exact** same interface as Tomli. Therefore, I recommend
 you checking [Tomli's usage](https://github.com/hukkin/tomli#usage).
 
-The only addition is that, instead of returining an object `T`, it returns
+The only addition is that, instead of returning an object `T`, it returns
 `Spanned[T]`, and nested objects are also `Spanned`, i.e., array and dictionnary
 values are also spanned.
 
@@ -124,7 +124,7 @@ TOML config file are coming from. This might be useful, e.g., if you want to
 have a validation layer, on top of the default TOML, and that you want to exactly
 pinpoint where an error originated.
 
-Otherwise, if you juste care about parsing TOML file or speed, then directly use
+Otherwise, if you just care about parsing TOML file or speed, then directly use
 Tomli (or other faster alternatives).
 
 ## Versions<a name="versions"></a>
