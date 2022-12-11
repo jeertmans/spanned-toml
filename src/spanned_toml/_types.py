@@ -37,10 +37,10 @@ class Spanned(Generic[T]):  # pragma: no cover
         else:
             return self.__inner == other
 
-    def __getitem__(self, key: Union["Spanned[str]", int]) -> "Spanned[Any]":
+    def __getitem__(self, key: Union["Spanned[str]", str, int]) -> "Spanned[Any]":
         if isinstance(self.__inner, dict):
             return self.__inner[key]
-        elif isinstance(self.__inner, list):
+        elif isinstance(self.__inner, list) and isinstance(key, int):
             return self.__inner[key]
         else:
             raise KeyError(

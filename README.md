@@ -17,6 +17,7 @@ was parsed from.
 
 - [Intro](#intro)
 - [Installation](#installation)
+- [Why choosing Spanned-Toml over others?](#why-choosing-spanned-toml-over-others)
 - [Usage](#usage)
   - [Parse a TOML string](#parse-a-toml-string)
   - [Parse a TOML file](#parse-a-toml-file)
@@ -43,7 +44,7 @@ on a `Spanned` object.
 pip install spanned-toml
 ```
 
-## Why choosing Spanned-Toml over others?<a name="why-choosing-spanned_toml-over-others"></a>
+## Why choosing Spanned-Toml over others?<a name="why-choosing-spanned-toml-over-others"></a>
 
 Spanned-Toml was mainly built for another project I am working on.
 
