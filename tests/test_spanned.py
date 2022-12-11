@@ -13,7 +13,10 @@ class TestSpanned(unittest.TestCase):
         keys_expected = ["one", "two", "arr"]
         values_expected = ["1", "'two'", "[]"]
 
-        for i, (key, value), in enumerate(tomllib.loads(doc).items()):
+        for (
+            i,
+            (key, value),
+        ) in enumerate(tomllib.loads(doc).items()):
             got_key = doc[key.span()]
             got_value = doc[value.span()]
             self.assertEqual(got_key, keys_expected[i])
@@ -81,12 +84,15 @@ is preserved.
         toml = tomllib.loads(doc)
 
         self.assertEqual(doc[toml["re"].span()], r"'''\d{2} apps is t[wo]o many'''")
-        self.assertEqual(doc[toml["lines"].span()], """'''
+        self.assertEqual(
+            doc[toml["lines"].span()],
+            """'''
 The first newline is
 trimmed in raw strings.
 All other whitespace
 is preserved.
-'''""")
+'''""",
+        )
 
     def test_preserve_number_format(self):
         doc = """
