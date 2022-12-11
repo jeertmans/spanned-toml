@@ -116,7 +116,7 @@ assert toml_dict == {
 Last, but not least, you can retrieve the exact part of the string that was used
 to parse a given key or value.
 
-```
+```python
 player_span = toml_dict["players"][0]["name"].span()
 
 assert toml_str[player_span] == '"Lehtinen"'  # Quotes are included in span
