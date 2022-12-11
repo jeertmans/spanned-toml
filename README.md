@@ -26,8 +26,8 @@ First, you parse the TOML file, which is valid, then you invalidate the `age`
 value because it is negative. But how to pinpoint the location of where `age`
 was defined to the user?
 
-There is where Spanned-Toml comes into play. For every key / value, you can
-obtain the span information about where it was define. The span is simple a
+This is where Spanned-Toml comes into play. For every key / value, you can
+obtain the span information about where it was defined. The span is simple a
 Python `slice`, that can be used to index the original TOML string.
 
 **Table of Contents**  *generated with [mdformat-toc](https://github.com/hukkin/mdformat-toc)*
