@@ -39,17 +39,19 @@ Python `slice`, that can be used to index the original TOML string.
 - [Installation](#installation)
 - [Why choosing Spanned-Toml over others?](#why-choosing-spanned-toml-over-others)
 - [Usage](#usage)
+- [Versions](#versions)
 
 <!-- mdformat-toc end -->
 
 ## Intro<a name="intro"></a>
 
 Spanned-Toml is a Python library for parsing [TOML](https://toml.io), with the
-addition of span information for every object (both keys and values).
-It is fully compatible with [TOML v1.0.0](https://toml.io/en/v1.0.0).
+**only** addition of span information for every object (both keys and values).
+It is fully compatible with [TOML v1.0.0](https://toml.io/en/v1.0.0), and its
+goal is to provide span information with minimal overhead over Tomli.
 
-Spanned-Toml provides the same features and API as Tomli. The only difference
-is that it returns a `Spanned[dict]`, instead of `dict`.
+As such, Spanned-Toml provides the same features and API as Tomli, with the only
+difference is that it returns a `Spanned[dict]`, instead of `dict`.
 
 If you whish to get the same output as with Tomli, you can always call `unspan()`
 on a `Spanned` object.
@@ -124,3 +126,10 @@ assert toml_str[player_span] == '"Lehtinen"'  # Quotes are included in span
 
 > NOTE: arrays of tables have an empty span, since then can be defined in
 > multiple parts of a given file.
+
+## Versions<a name="versions"></a>
+
+Toml-Spanned follows the same versions as Tomli, and tries to be in sync with it.
+
+Therefore, Tomli-Spanned's version `X.Y.Z.P` matches Tomli's version `X.Y.Z`.
+The `P` number of for patches, and is only intended to fix issues related to span.
