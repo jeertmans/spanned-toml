@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "spanned-toml"
-version = "2.0.1"  # DO NOT EDIT THIS LINE MANUALLY. LET bump2version UTILITY DO IT
+version = "2.0.1.1"  # DO NOT EDIT THIS LINE MANUALLY. LET bump2version UTILITY DO IT
 description = "A lil' TOML parser, but with span"
 authors = [
     { name = "Jérome Eertmans", email = "jeertmans@icloud.com" },
