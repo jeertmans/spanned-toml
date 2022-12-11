@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# SPDX-FileCopyrightText: 2021 Taneli Hukkinen
+# SPDX-FileCopyrightText: 2022 Jérome Eertmans, Taneli Hukkinen
 # Licensed to PSF under a Contributor Agreement.
 
 import json
@@ -58,7 +58,7 @@ class TestData(unittest.TestCase):
                     }
                     continue
                 toml_str = valid.read_bytes().decode()
-                actual = tomllib.loads(toml_str)
+                actual = tomllib.loads(toml_str).unspan()
                 actual = burntsushi.convert(actual)
                 expected = burntsushi.normalize(expected)
                 self.assertEqual(actual, expected)

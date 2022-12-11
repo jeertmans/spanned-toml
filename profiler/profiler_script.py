@@ -6,7 +6,7 @@ To generate and read results:
 """
 from pathlib import Path
 
-import tomli
+import spanned_toml as tomli
 
 benchmark_toml = (
     (Path(__file__).parent.parent / "benchmark" / "data.toml").read_bytes().decode()
